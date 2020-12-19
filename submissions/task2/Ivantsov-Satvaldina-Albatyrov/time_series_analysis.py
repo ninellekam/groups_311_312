@@ -1,7 +1,4 @@
-import numpy as np
 import pandas as pd
-from pandas import Series
-from pandas import DataFrame
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -15,12 +12,11 @@ warnings.filterwarnings('ignore')
 
 import statsmodels.api as sm
 from statsmodels.tsa.stattools import adfuller
-from statsmodels.iolib.table import SimpleTable
+#from statsmodels.iolib.table import SimpleTable
 
-import pylab
+#import pylab
 from pylab import rcParams
 rcParams['figure.figsize'] = 18, 8
-
 
 def ADF(series):
     dftest = adfuller(series.dropna())
@@ -31,7 +27,6 @@ def ADF(series):
         print('есть единичные корни, ряд не стационарен')
     else:
         print('единичных корней нет, ряд стационарен')
-
 
 def additive(data):
     result = sm.tsa.seasonal_decompose(data.Value, model='additive')
@@ -51,12 +46,6 @@ def additive(data):
     print('Resid:')
     ADF(result.resid)
 
-    series = [i+randrange(10) for i in range(1,100)]
-    result = sm.tsa.seasonal_decompose(data.Value, model='additive', period=1)
-    result.plot()
-    plt.show()
-
-
 def multiplicative(data):
     result = sm.tsa.seasonal_decompose(data.Value, model='multiplicative')
     result.plot()
@@ -75,40 +64,29 @@ def multiplicative(data):
     print('Resid:')
     ADF(result.resid)
 
-    series = [i**2.0 for i in range(1,100)]
-    result = sm.tsa.seasonal_decompose(series, model='multiplicative', period=1)
-    result.plot()
-    plt.show()
-
-
 data_training = pd.read_excel('~/prac/training.xlsx', index_col='Date', parse_dates=True)
 data_testing = pd.read_excel('~/prac/testing.xlsx', index_col='Date', parse_dates=True)
-
+sns.set()
 
 ADF(data_training)
 data_training.Value.plot(label='Training series')
 plt.legend(loc='upper left')
 plt.show()
 
-
 additive(data_training)
-
 multiplicative(data_training)
 
-
-data_training_diff = data_training.Value.diff()
+data_training_diff = data_training.Value.diff(periods=1).dropna()
 ADF(data_training_diff)
 data_training_diff.plot(label='Training series diff', figsize=(18,5))
 plt.legend(loc='upper left')
 plt.show()
 
-
 fig = plt.figure()
 ax1 = fig.add_subplot(211)
-fig = sm.graphics.tsa.plot_acf(data_training.Value.squeeze(), lags=50, ax=ax1)
+fig = sm.graphics.tsa.plot_acf(data_training_diff.squeeze(), lags=50, ax=ax1)
 ax2 = fig.add_subplot(212)
-fig = sm.graphics.tsa.plot_pacf(data_training.Value.squeeze(), lags=50, ax=ax2)
-
+fig = sm.graphics.tsa.plot_pacf(data_training_diff.squeeze(), lags=50, ax=ax2)
 
 model_0 = sm.tsa.ARIMA(data_training, order=(0,1,0), freq='MS').fit()
 model_1 = sm.tsa.ARIMA(data_training, order=(1,1,1), freq='MS').fit()
@@ -136,7 +114,6 @@ print('r2_0 R^2: %1.3f' % r2_0)
 print('r2_1 R^2: %1.3f' % r2_1)
 print('r2_2 R^2: %1.3f' % r2_2)
 
-
 ps = range(0, 2)
 d=1
 qs = range(0, 4)
@@ -150,7 +127,7 @@ best_aic = float("inf")
 for param in parameters_list:
     #try except нужен, потому что на некоторых наборах параметров модель не обучается
     try:
-        model=sm.tsa.ARIMA(data_training.Value, order=(param[0], d, param[1])).fit()
+        model=sm.tsa.ARIMA(data_training.Value, order=(param[0], d, param[1]),  freq='MS').fit()
     #выводим параметры, на которых модель не обучается и переходим к следующему набору
     except ValueError:
         print('wrong parameters:', param)
@@ -163,14 +140,11 @@ for param in parameters_list:
         best_param = param
     results.append([param, model.aic])
 
-
 result_table = pd.DataFrame(results)
 result_table.columns = ['parameters', 'aic']
 print(result_table.sort_values(by = 'aic', ascending=True))
 
-
 print(best_model.summary())
-
 
 data_training.Value.plot(label='Training series')
 data_testing.Value.plot(label='Testing series')
@@ -181,6 +155,6 @@ pred.plot(label='Time Series Prediction', style='r--')
 plt.legend(loc='upper left')
 plt.show()
 
-
 r2 = r2_score(data_testing.Value, pred)
 print('R^2: %1.3f' % r2)
+
